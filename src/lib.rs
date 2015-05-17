@@ -15,12 +15,69 @@ pub struct XmlDocument {
     pub data: Vec<Box<XmlData>>
 }
 
+impl fmt::Display for XmlDocument {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut s = String::new();
+        
+        for d in self.data.iter() {
+            s = format!("{}{}", s, d);
+        }
+        
+        s.fmt(f)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct XmlData {
     pub name: String,
     pub attributes: Vec<(String, String)>,
     pub data: Option<String>,
     pub sub_elements: Vec<Box<XmlData>>
+}
+
+fn indent(size: usize) -> String {
+        const INDENT: &'static str = "    ";
+            (0..size).map(|_| INDENT)
+                             .fold(String::with_capacity(size*INDENT.len()), |r, s| r + s)
+}
+
+fn attributes_to_string(attributes: &Vec<(String, String)>) -> String {
+    let mut attr = String::new();
+    for &(ref k, ref v) in attributes.iter(){
+        attr = format!("{} {}=\"{}\"", attr, k, v);
+    }
+
+    attr
+}
+
+fn format(data: &XmlData, depth: usize) -> String {
+    let mut sub =
+        if data.sub_elements.is_empty() {
+            String::new()
+        } else {
+            let mut sub = "\n".to_string();
+            for elmt in data.sub_elements.iter() {
+                sub = format!("{}{}", sub, format(elmt, depth + 1));
+            }
+            sub
+        };
+
+    let indt = indent(depth);
+    
+    let fmt_data = if let Some(ref d) = data.data {
+        format!("\n{}{}", indent(depth+1), d)
+    } else {
+        "".to_string()
+    };
+
+    format!("{}<{}{}>{}{}\n{}</{}>", indt, data.name, attributes_to_string(&data.attributes), fmt_data, sub, indt, data.name)
+}
+
+
+impl fmt::Display for XmlData {
+    fn fmt(&self, f : &mut fmt::Formatter) -> fmt::Result {
+       write!(f, "{}", format(self, 0)) 
+    }
 }
 
 fn map_owned_attributes(attrs: Vec<xml::attribute::OwnedAttribute>) -> Vec<(String, String)> {
@@ -173,9 +230,7 @@ mod tests {
         assert!(data.sub_elements.is_empty());
 
         assert_eq!(data.data, Some("test".to_string()));
-
     }
-
 
     #[test]
     fn test_from_str(){
@@ -199,6 +254,5 @@ mod tests {
         assert!(data.sub_elements.is_empty());
 
         assert_eq!(data.data, Some("test".to_string()));
-
     }
 }
