@@ -118,13 +118,18 @@ fn to_kv(data: &XmlData) -> (String, json::Json) {
     if data.data.is_some(){
         map.insert("_".to_string(), data.data.clone().unwrap().to_json());
     }
-
+    
     for (k, v) in data.sub_elements.iter().map(|x|{to_kv(x)}){
         map.insert(k, v);
     }
-
+    
+    let mut attr : BTreeMap<String, json::Json> = BTreeMap::new();
     for &(ref k, ref v) in data.attributes.iter() {
-        map.insert(k.clone(), v.to_json());
+        attr.insert(k.clone(), v.to_json());
+    }
+    
+    if !attr.is_empty() {
+        map.insert("$".to_string(), attr.to_json());
     }
 
     (data.name.clone(), map.to_json())
