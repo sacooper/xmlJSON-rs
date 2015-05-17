@@ -6,13 +6,13 @@ Convert XML data to JSON. Note that this is not yet well tested. Use at your own
 
 ## Usage
 Add this to your Cargo.toml:
-```
+```rust
 [dependencies]
 xmlJSON = "*"
 ```
 
 and add this to your crate root:
-```
+```rust
 extern crate xmlJSON;
 ```
 
