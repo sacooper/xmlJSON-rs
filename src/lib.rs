@@ -1,3 +1,35 @@
+//! Structs for conversions from XML to JSON
+//!
+//! ```rust
+//! extern crate xmlJSON;
+//! extern crate rustc_serialize;
+//!
+//! use xmlJSON::XmlDocument;
+//! use rustc_serialize::json;
+//! use std::str::FromStr;
+//!
+//! let s = "<test lang=\"rust\">An XML Document <testElement>A test
+//! element</testElement></test>"
+//! let document : XmlDocument = XmlDocument::from_str(s).unwrap();
+//! let jsn : json::Json = document.to_json(); 
+//! ```
+//!
+//! The resulting Json will be of the form
+//!
+//! ```javascript
+//! {
+//!     "test": {
+//!         "$": {
+//!             "lang": "rust"
+//!         },
+//!         "_" : "An Xml Document",
+//!         "testElement": {
+//!             "_" : "A test element" 
+//!         }
+//!     }
+//! }
+//! ```
+
 extern crate xml;
 extern crate rustc_serialize;
 
@@ -12,6 +44,7 @@ use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
 pub struct XmlDocument {
+    // Data contained within the parsed XML Document
     pub data: Vec<Box<XmlData>>
 }
 
@@ -51,7 +84,7 @@ fn attributes_to_string(attributes: &Vec<(String, String)>) -> String {
 }
 
 fn format(data: &XmlData, depth: usize) -> String {
-    let mut sub =
+    let sub =
         if data.sub_elements.is_empty() {
             String::new()
         } else {
@@ -101,7 +134,6 @@ fn parse(mut data: Vec<XmlEvent>, current: Option<Box<XmlData>>, mut current_vec
                 
                 if let Some(mut crnt) = current {
                     crnt.sub_elements.extend(inner);
-                    println!("{:?}", crnt);
                     parse(rest, Some(crnt), current_vec, trim)
                 } else {
                     current_vec.extend(inner);
