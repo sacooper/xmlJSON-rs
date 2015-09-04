@@ -1,34 +1,15 @@
 //! Structs for conversions from XML to JSON
 //!
-//! ```rust
-//! extern crate xmlJSON;
-//! extern crate rustc_serialize;
-//!
-//! use xmlJSON::XmlDocument;
-//! use rustc_serialize::json;
+//! # Example
+//! ```
+//! use xmlJSON;
 //! use std::str::FromStr;
-//!
-//! let s = "<test lang=\"rust\">An XML Document <testElement>A test
-//! element</testElement></test>"
-//! let document : XmlDocument = XmlDocument::from_str(s).unwrap();
-//! let jsn : json::Json = document.to_json(); 
-//! ```
-//!
-//! The resulting Json will be of the form
-//!
-//! ```javascript
-//! {
-//!     "test": {
-//!         "$": {
-//!             "lang": "rust"
-//!         },
-//!         "_" : "An Xml Document",
-//!         "testElement": {
-//!             "_" : "A test element" 
-//!         }
-//!     }
-//! }
-//! ```
+//! 
+//! let test = "<note type=\"Reminder\">
+//!                 test
+//!             </note>";
+//! let data = XmlDocument::from_str(test);
+
 
 extern crate xml;
 extern crate rustc_serialize;
@@ -42,47 +23,63 @@ use std::io::Cursor;
 use rustc_serialize::json;
 use std::collections::BTreeMap;
 
+/// An XML Document
 #[derive(Debug, Clone)]
 pub struct XmlDocument {
-    // Data contained within the parsed XML Document
-    pub data: Vec<Box<XmlData>>
+    /// Data contained within the parsed XML Document
+    pub data: Vec<XmlData>
 }
 
+// Print as JSON
 impl fmt::Display for XmlDocument {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut s = String::new();
-        
+
         for d in self.data.iter() {
             s = format!("{}{}", s, d);
         }
-        
+
         s.fmt(f)
     }
 }
 
+/// An XML Tag
+///
+/// For exammple:
+///
+/// ```XML
+/// <foo bar="baz">
+///     test text
+///     <sub></sub>
+/// </foo>
+/// ```
 #[derive(Debug, Clone)]
 pub struct XmlData {
+    /// Name of the tag (i.e. "foo")
     pub name: String,
+    /// Key-value pairs of the attributes (i.e. ("bar", "baz"))
     pub attributes: Vec<(String, String)>,
+    /// Data (i.e. "test text")
     pub data: Option<String>,
-    pub sub_elements: Vec<Box<XmlData>>
+    /// Sub elements (i.e. an XML element of "sub")
+    pub sub_elements: Vec<XmlData>
 }
 
+// Generate indentation
 fn indent(size: usize) -> String {
-        const INDENT: &'static str = "    ";
-            (0..size).map(|_| INDENT)
-                             .fold(String::with_capacity(size*INDENT.len()), |r, s| r + s)
+    const INDENT: &'static str = "    ";
+    (0..size).map(|_| INDENT)
+        .fold(String::with_capacity(size*INDENT.len()), |r, s| r + s)
 }
 
-fn attributes_to_string(attributes: &Vec<(String, String)>) -> String {
-    let mut attr = String::new();
-    for &(ref k, ref v) in attributes.iter(){
-        attr = format!("{} {}=\"{}\"", attr, k, v);
-    }
-
-    attr
+// Get the attributes as a string 
+fn attributes_to_string(attributes: &[(String, String)]) -> String {
+    attributes.iter().fold(String::new(), |acc, &(ref k, ref v)|{
+        format!("{} {}=\"{}\"", acc, k , v)
+    })
 }
 
+// Format the XML data as a string
 fn format(data: &XmlData, depth: usize) -> String {
     let sub =
         if data.sub_elements.is_empty() {
@@ -96,7 +93,7 @@ fn format(data: &XmlData, depth: usize) -> String {
         };
 
     let indt = indent(depth);
-    
+
     let fmt_data = if let Some(ref d) = data.data {
         format!("\n{}{}", indent(depth+1), d)
     } else {
@@ -106,32 +103,33 @@ fn format(data: &XmlData, depth: usize) -> String {
     format!("{}<{}{}>{}{}\n{}</{}>", indt, data.name, attributes_to_string(&data.attributes), fmt_data, sub, indt, data.name)
 }
 
-
 impl fmt::Display for XmlData {
     fn fmt(&self, f : &mut fmt::Formatter) -> fmt::Result {
-       write!(f, "{}", format(self, 0)) 
+        write!(f, "{}", format(self, 0)) 
     }
 }
 
+// Get the XML atributes as a string
 fn map_owned_attributes(attrs: Vec<xml::attribute::OwnedAttribute>) -> Vec<(String, String)> {
     attrs.into_iter().map(|attr|{
         (attr.name.local_name, attr.value)
     }).collect()
 }
 
-fn parse(mut data: Vec<XmlEvent>, current: Option<Box<XmlData>>, mut current_vec: Vec<Box<XmlData>>, trim: bool) -> (Vec<Box<XmlData>>, Vec<XmlEvent>) {
+// Parse the data
+fn parse(mut data: Vec<XmlEvent>, current: Option<XmlData>, mut current_vec: Vec<XmlData>, trim: bool) -> (Vec<XmlData>, Vec<XmlEvent>) {
     if let Some(elmt) = data.pop() {
         match elmt {
             XmlEvent::StartElement{name, attributes, ..} => {
-                let inner = Box::new(XmlData{
+                let inner = XmlData{
                     name: name.local_name,
                     attributes: map_owned_attributes(attributes),
                     data: None,
                     sub_elements: Vec::new()
-                });
-                
+                };
+
                 let (inner, rest) = parse(data, Some(inner), Vec::new(), trim);
-                
+
                 if let Some(mut crnt) = current {
                     crnt.sub_elements.extend(inner);
                     parse(rest, Some(crnt), current_vec, trim)
@@ -145,7 +143,7 @@ fn parse(mut data: Vec<XmlEvent>, current: Option<Box<XmlData>>, mut current_vec
                 if let Some(mut crnt) = current {
                     crnt.data = Some(chr);
                     parse(data, Some(crnt), current_vec, trim)
-                    
+
                 } else {
                     panic!("Invalid form of XML doc");
                 }
@@ -183,6 +181,7 @@ impl XmlDocument {
     }
 }
 
+/// Error when parsing XML
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParseXmlError;
 
@@ -191,6 +190,8 @@ impl fmt::Display for ParseXmlError{
         "Could not parse string to XML".fmt(f)
     }
 }
+
+// Generate an XML document from a string
 impl FromStr for XmlDocument {
     type Err = ParseXmlError;
 
@@ -200,6 +201,7 @@ impl FromStr for XmlDocument {
 
 }
 
+// Convert the data to an key-value pair of JSON
 fn to_kv(data: &XmlData) -> (String, json::Json) {
     use rustc_serialize::json::ToJson;
 
@@ -207,31 +209,31 @@ fn to_kv(data: &XmlData) -> (String, json::Json) {
     if data.data.is_some(){
         map.insert("_".to_string(), data.data.clone().unwrap().to_json());
     }
-    
+
     for (k, v) in data.sub_elements.iter().map(|x|{to_kv(x)}){
         map.insert(k, v);
     }
-    
+
     let mut attr : BTreeMap<String, json::Json> = BTreeMap::new();
     for &(ref k, ref v) in data.attributes.iter() {
         attr.insert(k.clone(), v.to_json());
     }
-    
+
     if !attr.is_empty() {
         map.insert("$".to_string(), attr.to_json());
     }
 
     (data.name.clone(), map.to_json())
-
 }
+
 impl json::ToJson for XmlDocument {
     fn to_json(&self) -> json::Json {
         let mut map: BTreeMap<String, json::Json> = BTreeMap::new();
-        
+
         for (k, v) in self.data.iter().map(|x|{to_kv(x)}) {
             map.insert(k, v);
         }
-        
+
         map.to_json() 
     }
 }
@@ -250,13 +252,13 @@ mod tests {
                     </note>".to_string();
         let data = XmlDocument::from_reader(Cursor::new(test.into_bytes()), true);
         assert_eq!(data.data.len(), 1);
-        
+
         let ref data = data.data[0];
         assert_eq!(data.name, "note");
-        
+
         let mut attrs = Vec::new();
         attrs.push(("type".to_string(), "Reminder".to_string()));
-        
+
         assert_eq!(data.attributes, attrs);
 
         assert!(data.sub_elements.is_empty());
@@ -272,15 +274,15 @@ mod tests {
         let data = XmlDocument::from_str(test);
         assert!(data.is_ok());
         let data = data.unwrap();
-        
+
         assert_eq!(data.data.len(), 1);
-        
+
         let ref data = data.data[0];
         assert_eq!(data.name, "note");
-        
+
         let mut attrs = Vec::new();
         attrs.push(("type".to_string(), "Reminder".to_string()));
-        
+
         assert_eq!(data.attributes, attrs);
 
         assert!(data.sub_elements.is_empty());
