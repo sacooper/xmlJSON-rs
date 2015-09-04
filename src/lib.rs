@@ -2,7 +2,7 @@
 //!
 //! # Example
 //! ```
-//! use xmlJSON;
+//! use xmlJSON::XmlDocument;
 //! use std::str::FromStr;
 //! 
 //! let test = "<note type=\"Reminder\">
