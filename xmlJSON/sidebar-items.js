@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["ParseXmlError","Error when parsing XML"],["XmlData","An XML Tag"],["XmlDocument","An XML Document"]]});
