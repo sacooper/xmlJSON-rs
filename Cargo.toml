@@ -1,7 +1,7 @@
 [package]
 name = "xmlJSON"
 version = "0.1.2"
-authors = ["Scott Cooper <scott.cooper2@mail.mcgill.ca>"]
+authors = ["Scott Cooper <scott@sacooper.io>"]
 
 description = "Conversions from XML to JSON"
 readme = "README.md"
