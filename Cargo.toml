@@ -7,8 +7,8 @@ description = "Conversions from XML to JSON"
 readme = "README.md"
 license = "MIT"
 repository = "https://github.com/sacooper/xmlJSON-rs"
-documentation = "http://sacooper.github.io/xmlJSON-rs/xmlJSON/index.html"
-homepage = "http://sacooper.github.io/xmlJSON-rs/xmlJSON/index.html"
+documentation = "http://sacooper.io/xmlJSON-rs/xmlJSON/index.html"
+homepage = "http://sacooper.io/xmlJSON-rs/xmlJSON/index.html"
 keywords = ["XML", "JSON", "xml", "json", "conversion"]
 
 [dependencies]
