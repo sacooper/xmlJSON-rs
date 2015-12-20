@@ -15,8 +15,7 @@ extern crate xml;
 extern crate rustc_serialize;
 
 use std::io::prelude::*;
-use xml::reader::EventReader;
-use xml::reader::events::*;
+use xml::reader::{EventReader,XmlEvent};
 use std::str::FromStr;
 use std::fmt;
 use std::io::Cursor;
@@ -174,7 +173,7 @@ fn parse(mut data: Vec<XmlEvent>, current: Option<XmlData>, mut current_vec: Vec
 impl XmlDocument {
     pub fn from_reader<R>(source : R, trim: bool) -> Self where R : Read {        
         let mut parser = EventReader::new(source);
-        let mut events : Vec<XmlEvent> = parser.events().collect();
+        let mut events : Vec<XmlEvent> = parser.into_iter().map(|x| x.unwrap() ).collect();
         events.reverse();
         let (data, _) = parse(events, None, Vec::new(), trim);
         XmlDocument{ data: data }
