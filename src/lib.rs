@@ -24,7 +24,7 @@ use std::collections::BTreeMap;
 
 /// An XML Document
 #[derive(Debug, Clone)]
-pub struct XmlDocument {
+pub struct XmlDocument { 
     /// Data contained within the parsed XML Document
     pub data: Vec<XmlData>
 }
@@ -142,7 +142,6 @@ fn parse(mut data: Vec<XmlEvent>, current: Option<XmlData>, mut current_vec: Vec
                 if let Some(mut crnt) = current {
                     crnt.data = Some(chr);
                     parse(data, Some(crnt), current_vec, trim)
-
                 } else {
                     panic!("Invalid form of XML doc");
                 }
@@ -205,18 +204,56 @@ fn to_kv(data: &XmlData) -> (String, json::Json) {
     use rustc_serialize::json::ToJson;
 
     let mut map: BTreeMap<String, json::Json> = BTreeMap::new();
+
     if data.data.is_some(){
         map.insert("_".to_string(), data.data.clone().unwrap().to_json());
     }
 
     for (k, v) in data.sub_elements.iter().map(|x|{to_kv(x)}){
-        map.insert(k, v);
+        let existed = if let Some(it) = map.get_mut(&k) {
+            use rustc_serialize::json::Json;
+            match it {
+                &mut Json::Array(ref mut a) => {
+                    a.push(v.to_json());
+                },
+                n => {
+                    let x = vec![n.clone(), v.to_json()];
+                    *n = x.to_json();
+                }
+            }
+            true
+        } else {
+            false
+        };
+
+        if !existed {
+            map.insert(k.clone(), v.to_json()); 
+        }
     }
 
     let mut attr : BTreeMap<String, json::Json> = BTreeMap::new();
     for &(ref k, ref v) in data.attributes.iter() {
-        attr.insert(k.clone(), v.to_json());
+        let existed = if let Some(it) = attr.get_mut(k) {
+            use rustc_serialize::json::Json;
+            match it {
+                &mut Json::Array(ref mut a) => {
+                    a.push(v.to_json());
+                },
+                n => {
+                    let x = vec![n.clone(), v.to_json()];
+                    *n = x.to_json();
+                }
+            }
+            true
+        } else {
+            false
+        };
+
+        if !existed {
+            attr.insert(k.clone(), v.to_json()); 
+        }
     }
+
 
     if !attr.is_empty() {
         map.insert("$".to_string(), attr.to_json());
