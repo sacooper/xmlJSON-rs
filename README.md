@@ -10,7 +10,7 @@ Convert XML data to JSON. Note that this is not yet well tested. Use at your own
 Add this to your Cargo.toml:
 ```rust
 [dependencies]
-xmlJSON = "*"
+xmlJSON = "0.1.3"
 ```
 
 Structs for conversions from XML to JSON
