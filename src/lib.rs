@@ -16,6 +16,9 @@ extern crate rustc_serialize;
 
 use std::io::prelude::*;
 use xml::reader::{EventReader,XmlEvent};
+use xml::namespace::{self, Namespace};
+use xml::attribute::OwnedAttribute;
+use xml::name::OwnedName;
 use std::str::FromStr;
 use std::fmt;
 use std::io::Cursor;
@@ -121,7 +124,7 @@ fn map_owned_attributes(attrs: Vec<xml::attribute::OwnedAttribute>) -> Vec<(Stri
 }
 
 // Parse the data
-fn parse(mut data: Vec<XmlEvent>, current: Option<XmlData>, mut current_vec: Vec<XmlData>, trim: bool) -> Result<(Vec<XmlData>, Vec<XmlEvent>), String> {
+fn parse(mut data: Vec<XmlEvent>, current: Option<XmlData>, mut current_vec: Vec<XmlData>, trim: bool, current_namespace : Namespace) -> Result<(Vec<XmlData>, Vec<XmlEvent>), String> {
     if let Some(elmt) = data.pop() {
         match elmt {
             XmlEvent::StartElement{name, attributes, namespace} => {
@@ -131,6 +134,29 @@ fn parse(mut data: Vec<XmlEvent>, current: Option<XmlData>, mut current_vec: Vec
                     name.local_name
                 };
 
+                let attributes = if namespace == current_namespace {
+                    attributes
+                } else {
+                    let mut attributes = attributes;
+                    let n = namespace.clone();
+                    let ns = n.into_iter()
+                        .filter(|&(k,v)|{
+                            (k != namespace::NS_NO_PREFIX) && (v != namespace::NS_EMPTY_URI)
+                        })
+                        .map(|(k,v)| {
+                        OwnedAttribute {
+                            name: OwnedName {
+                                local_name: k.to_string(),
+                                namespace: Some(v.to_string()),
+                                prefix: Some("xmlns".to_string())
+                            },
+                            value: v.to_string()
+                        }
+                    });
+                    attributes.extend(ns);
+                    attributes
+                };
+
                 let inner = XmlData{
                     name: fmt_name,
                     attributes: map_owned_attributes(attributes),
@@ -138,21 +164,21 @@ fn parse(mut data: Vec<XmlEvent>, current: Option<XmlData>, mut current_vec: Vec
                     sub_elements: Vec::new()
                 };
 
-                let (inner, rest) = try!(parse(data, Some(inner), Vec::new(), trim));
+                let (inner, rest) = try!(parse(data, Some(inner), Vec::new(), trim, namespace.clone()));
 
                 if let Some(mut crnt) = current {
                     crnt.sub_elements.extend(inner);
-                    parse(rest, Some(crnt), current_vec, trim)
+                    parse(rest, Some(crnt), current_vec, trim, namespace)
                 } else {
                     current_vec.extend(inner);
-                    parse(rest, None, current_vec, trim)
+                    parse(rest, None, current_vec, trim, namespace)
                 }
             },
             XmlEvent::Characters(chr) => {
                 let chr = if trim { chr.trim().to_string() } else {chr};
                 if let Some(mut crnt) = current {
                     crnt.data = Some(chr);
-                    parse(data, Some(crnt), current_vec, trim)
+                    parse(data, Some(crnt), current_vec, trim, current_namespace)
                 } else {
                     Err("Invalid form of XML doc".to_string())
                 }
@@ -174,7 +200,7 @@ fn parse(mut data: Vec<XmlEvent>, current: Option<XmlData>, mut current_vec: Vec
                     Err(format!("Invalid end tag: {}", name.local_name))
                 }
             }
-            _ => parse(data, current, current_vec, trim)
+            _ => parse(data, current, current_vec, trim, current_namespace)
         }
     } else {
         if current.is_some() {
@@ -191,7 +217,7 @@ impl XmlDocument {
         let mut events : Vec<XmlEvent> = parser.into_iter().map(|x| x.unwrap() ).collect();
         events.reverse();
 
-        parse(events, None, Vec::new(), trim)
+        parse(events, None, Vec::new(), trim, Namespace::empty())
             .map(|(data, _)| XmlDocument{ data: data } )
             .map_err(|e| ParseXmlError(e))
     }
