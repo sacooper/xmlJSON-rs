@@ -99,7 +99,7 @@ fn format(data: &XmlData, depth: usize) -> String {
         "".to_string()
     };
 
-    format!("{}<{}{}>{}{}\n{}</{}>", indt, data.name, attributes_to_string(&data.attributes), fmt_data, sub, indt, data.name)
+    format!("{}<{}{}>{}{}\n{}</{}>\n", indt, data.name, attributes_to_string(&data.attributes), fmt_data, sub, indt, data.name)
 }
 
 impl fmt::Display for XmlData {
@@ -111,23 +111,34 @@ impl fmt::Display for XmlData {
 // Get the XML atributes as a string
 fn map_owned_attributes(attrs: Vec<xml::attribute::OwnedAttribute>) -> Vec<(String, String)> {
     attrs.into_iter().map(|attr|{
-        (attr.name.local_name, attr.value)
+        let fmt_name = if attr.name.prefix.is_some() {
+            format!("{}:{}", attr.name.prefix.unwrap(), attr.name.local_name)
+        } else {
+            attr.name.local_name.clone()
+        };
+        (fmt_name, attr.value)
     }).collect()
 }
 
 // Parse the data
-fn parse(mut data: Vec<XmlEvent>, current: Option<XmlData>, mut current_vec: Vec<XmlData>, trim: bool) -> (Vec<XmlData>, Vec<XmlEvent>) {
+fn parse(mut data: Vec<XmlEvent>, current: Option<XmlData>, mut current_vec: Vec<XmlData>, trim: bool) -> Result<(Vec<XmlData>, Vec<XmlEvent>), String> {
     if let Some(elmt) = data.pop() {
         match elmt {
-            XmlEvent::StartElement{name, attributes, ..} => {
+            XmlEvent::StartElement{name, attributes, namespace} => {
+                let fmt_name = if name.prefix.is_some() {
+                    format!("{}:{}", name.prefix.unwrap(), name.local_name)
+                } else {
+                    name.local_name
+                };
+
                 let inner = XmlData{
-                    name: name.local_name,
+                    name: fmt_name,
                     attributes: map_owned_attributes(attributes),
                     data: None,
                     sub_elements: Vec::new()
                 };
 
-                let (inner, rest) = parse(data, Some(inner), Vec::new(), trim);
+                let (inner, rest) = try!(parse(data, Some(inner), Vec::new(), trim));
 
                 if let Some(mut crnt) = current {
                     crnt.sub_elements.extend(inner);
@@ -143,49 +154,56 @@ fn parse(mut data: Vec<XmlEvent>, current: Option<XmlData>, mut current_vec: Vec
                     crnt.data = Some(chr);
                     parse(data, Some(crnt), current_vec, trim)
                 } else {
-                    panic!("Invalid form of XML doc");
+                    Err("Invalid form of XML doc".to_string())
                 }
             },
             XmlEvent::EndElement{name} => {
+                let fmt_name = if name.prefix.is_some() {
+                    format!("{}:{}", name.prefix.unwrap(), name.local_name)
+                } else {
+                    name.local_name.clone()
+                };
                 if let Some(crnt) = current {
-                    if crnt.name == name.local_name {
+                    if crnt.name == fmt_name {
                         current_vec.push(crnt);
-                        return (current_vec, data)
+                        return Ok((current_vec, data))
                     } else {
-                        panic!(format!("Invalid end tag: expected {}, got {}", crnt.name, name.local_name)) 
+                        Err(format!("Invalid end tag: expected {}, got {}", crnt.name, name.local_name)) 
                     }
                 } else {
-                    panic!(format!("Invalid end tag: {}", name.local_name))
+                    Err(format!("Invalid end tag: {}", name.local_name))
                 }
             }
             _ => parse(data, current, current_vec, trim)
         }
     } else {
         if current.is_some() {
-            panic!("Invalid end tag");
+            Err("Invalid end tag".to_string())
         } else {
-            (current_vec, Vec::new())
+            Ok((current_vec, Vec::new()))
         }
     }
 }
 
 impl XmlDocument {
-    pub fn from_reader<R>(source : R, trim: bool) -> Self where R : Read {        
+    pub fn from_reader<R>(source : R, trim: bool) -> Result<Self, ParseXmlError> where R : Read {        
         let mut parser = EventReader::new(source);
         let mut events : Vec<XmlEvent> = parser.into_iter().map(|x| x.unwrap() ).collect();
         events.reverse();
-        let (data, _) = parse(events, None, Vec::new(), trim);
-        XmlDocument{ data: data }
+
+        parse(events, None, Vec::new(), trim)
+            .map(|(data, _)| XmlDocument{ data: data } )
+            .map_err(|e| ParseXmlError(e))
     }
 }
 
 /// Error when parsing XML
 #[derive(Debug, Clone, PartialEq)]
-pub struct ParseXmlError;
+pub struct ParseXmlError(String);
 
 impl fmt::Display for ParseXmlError{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result{
-        "Could not parse string to XML".fmt(f)
+        write!(f, "Coult not parse string to XML: {}", self.0)
     }
 }
 
@@ -194,9 +212,8 @@ impl FromStr for XmlDocument {
     type Err = ParseXmlError;
 
     fn from_str(s: &str) -> Result<XmlDocument, ParseXmlError> {
-        Ok(XmlDocument::from_reader(Cursor::new(s.to_string().into_bytes()), true))
+        XmlDocument::from_reader(Cursor::new(s.to_string().into_bytes()), true)
     }
-
 }
 
 // Convert the data to an key-value pair of JSON
@@ -271,58 +288,5 @@ impl json::ToJson for XmlDocument {
         }
 
         map.to_json() 
-    }
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::XmlDocument;
-    use std::io::Cursor;
-    use std::str::FromStr;
-
-    #[test]
-    fn test_basic_xml(){
-        let test = "<note type=\"Reminder\">
-                        test
-                    </note>".to_string();
-        let data = XmlDocument::from_reader(Cursor::new(test.into_bytes()), true);
-        assert_eq!(data.data.len(), 1);
-
-        let ref data = data.data[0];
-        assert_eq!(data.name, "note");
-
-        let mut attrs = Vec::new();
-        attrs.push(("type".to_string(), "Reminder".to_string()));
-
-        assert_eq!(data.attributes, attrs);
-
-        assert!(data.sub_elements.is_empty());
-
-        assert_eq!(data.data, Some("test".to_string()));
-    }
-
-    #[test]
-    fn test_from_str(){
-        let test = "<note type=\"Reminder\">
-                        test
-                    </note>";
-        let data = XmlDocument::from_str(test);
-        assert!(data.is_ok());
-        let data = data.unwrap();
-
-        assert_eq!(data.data.len(), 1);
-
-        let ref data = data.data[0];
-        assert_eq!(data.name, "note");
-
-        let mut attrs = Vec::new();
-        attrs.push(("type".to_string(), "Reminder".to_string()));
-
-        assert_eq!(data.attributes, attrs);
-
-        assert!(data.sub_elements.is_empty());
-
-        assert_eq!(data.data, Some("test".to_string()));
     }
 }
