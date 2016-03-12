@@ -3,11 +3,11 @@
 [![Crates.io](https://img.shields.io/crates/l/xmlJSON.svg)](https://crates.io/crates/xmlJSON)
 [![Crates.io](https://img.shields.io/crates/v/xmlJSON.svg)](https://crates.io/crates/xmlJSON)
 [![Crates.io](https://img.shields.io/crates/d/xmlJSON.svg)](https://crates.io/crates/xmlJSON)
+[![Build Status](https://travis-ci.org/sacooper/xmlJSON-rs.svg?branch=master)](https://travis-ci.org/sacooper/xmlJSON-rs.svg)
 
 Convert XML data to JSON. Note that this is not yet well tested. Use at your own risk.
 
 ## Status
-[![Build Status](https://travis-ci.org/sacooper/xmlJSON-rs.svg?branch=master)](https://travis-ci.org/sacooper/xmlJSON-rs.svg)
 
 [Docs](http://sacooper.io/xmlJSON-rs/xmlJSON/index.html)
 
