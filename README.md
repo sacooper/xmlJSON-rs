@@ -1,4 +1,9 @@
 # xmlJSON
+
+[![Crates.io](https://img.shields.io/crates/l/xmlJSON.svg)](https://crates.io/crates/xmlJSON)
+[![Crates.io](https://img.shields.io/crates/v/xmlJSON.svg)](https://crates.io/crates/xmlJSON)
+[![Crates.io](https://img.shields.io/crates/d/xmlJSON.svg)](https://crates.io/crates/xmlJSON)
+
 Convert XML data to JSON. Note that this is not yet well tested. Use at your own risk.
 
 ## Status
